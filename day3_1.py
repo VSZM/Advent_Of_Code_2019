@@ -1,16 +1,5 @@
 import numpy
 
-def getIntersections(points, vector):
-    
-    intersections = []
-
-    points_of_vector = generatePointsBetween(*vector)
-    for point in points_of_vector:
-        if point in points:
-            intersections.append(point)
-
-    return intersections
-
 
 def generatePointsBetween(point1, point2):
     points = set()
@@ -27,7 +16,7 @@ def generatePointsBetween(point1, point2):
 
 def closestIntersection(instructions1, instructions2):
     points_1 = set()
-    intersections = []
+    points_2 = set()
 
     cur_pos = (0,0)
     for instruction in instructions1:
@@ -52,13 +41,10 @@ def closestIntersection(instructions1, instructions2):
             next_pos = (cur_pos[0], cur_pos[1] - int(instruction[1:]))
         elif instruction[0] == 'U':
             next_pos = (cur_pos[0], cur_pos[1] + int(instruction[1:]))
-        curr_intersections = getIntersections(points_1, (cur_pos, next_pos))
-
-        if len(curr_intersections) > 0:
-            intersections.extend(curr_intersections)
-
+        points_2.update(generatePointsBetween(cur_pos, next_pos))
         cur_pos = next_pos
 
+    intersections = points_1.intersection(points_2)
     intersections.remove((0, 0))
     return min([abs(x) + abs(y) for x,y in intersections])
 

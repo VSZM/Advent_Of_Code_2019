@@ -5,11 +5,18 @@ import sys
 POSITION_MODE = 0
 VALUE_MODE = 1
 
-class State(object):
+class ProgramPause(Exception):
+    pass
 
-    def __init__(self, memory, ip):
+
+class ThreadState(object):
+
+    def __init__(self, memory, ip, input_stream, output, name = None):
         self.memory = memory
         self.ip = ip
+        self.input_stream = input_stream
+        self.output = output
+        self.name = name
 
 class InstructionBase(ABC):
 
@@ -22,7 +29,7 @@ class InstructionBase(ABC):
         self.operand3_mode = operand3_mode
 
     @abstractmethod
-    def operate(self, state: State) -> State:
+    def operate(self, state: ThreadState) -> ThreadState:
         pass
 
 class IOInstruction(InstructionBase):
@@ -42,7 +49,7 @@ class BinaryInstruction(InstructionBase):
         super().__init__(operand1, operand1_mode, operand2, operand2_mode, operand3, operand3_mode)
         self.operator = operator
 
-    def operate(self, state: State) -> State:
+    def operate(self, state: ThreadState) -> ThreadState:
         memory = state.memory
         if self.operand1_mode == POSITION_MODE:
             a = memory[memory[self.operand1]]
@@ -66,13 +73,17 @@ class BinaryInstruction(InstructionBase):
 class ReadInput(IOInstruction):
 
     
-    def __init__(self, operand1, input_num):
+    def __init__(self, operand1):
         super().__init__(operand1)
-        self.input_num = input_num
 
-    def operate(self, state: State) -> State:
-        state.memory[state.memory[self.operand1]] = self.input_num
+    def operate(self, state: ThreadState) -> ThreadState:
+        if len(state.input_stream) == 0:
+            #print(f'{state.name} reading failed, halting. ip = {state.ip}')
+            raise ProgramPause('Empty input stream, waiting')
+        #print(f'{state.name} reading {state.input_stream[0]} to {state.memory[self.operand1]}. ip = {state.ip}')
+        state.memory[state.memory[self.operand1]] = state.input_stream[0]
         state.ip += 2
+        state.input_stream = state.input_stream[1:]
         return state
     
     def __str__(self):
@@ -87,12 +98,12 @@ class PrintOutput(IOInstruction):
     def __init__(self, operand1, operand1_mode):
         super().__init__(operand1, operand1_mode)
 
-    def operate(self, state: State) -> State:
+    def operate(self, state: ThreadState) -> ThreadState:
         memory = state.memory
         if self.operand1_mode == POSITION_MODE:
-            print(memory[memory[self.operand1]])
+            state.output.append(memory[memory[self.operand1]])
         else:
-            print(memory[self.operand1])
+            state.output.append(memory[self.operand1])
 
         state.ip += 2
         return state
@@ -136,7 +147,7 @@ class JumpNonZero(UnaryInstruction):
     def __init__(self, operand1, operand1_mode = None, operand2 = None, operand2_mode = None):
         super().__init__(operand1, operand1_mode, operand2, operand2_mode)
 
-    def operate(self, state: State) -> State:
+    def operate(self, state: ThreadState) -> ThreadState:
         memory = state.memory
         if self.operand1_mode == POSITION_MODE:
             expr = memory[memory[self.operand1]]
@@ -166,7 +177,7 @@ class JumpZero(UnaryInstruction):
     def __init__(self, operand1, operand1_mode = None, operand2 = None, operand2_mode = None):
         super().__init__(operand1, operand1_mode, operand2, operand2_mode)
 
-    def operate(self, state: State) -> State:
+    def operate(self, state: ThreadState) -> ThreadState:
         memory = state.memory
         if self.operand1_mode == POSITION_MODE:
             expr = memory[memory[self.operand1]]
@@ -218,14 +229,13 @@ class Equals(BinaryInstruction):
     __repr__ = __str__
 
 
-def interpretProgram(memory: List[int], input_num) -> List[InstructionBase]:
+def interpretProgram(state: ThreadState, verbose: bool = False) -> List[int]:
     instructions = []
-    state = State(memory, 0)
     while state.memory[state.ip] != 99:
         memory = state.memory
         ip = state.ip
         if memory[ip] == 3:
-            instruction = ReadInput(ip + 1, input_num)
+            instruction = ReadInput(ip + 1)
         else:
             opcode = str(memory[ip]).rjust(5, '0')
             mode1 = int(opcode[-3])
@@ -248,18 +258,25 @@ def interpretProgram(memory: List[int], input_num) -> List[InstructionBase]:
             else:
                 raise ValueError('Invalid state')
         
-        instruction.operate(state)
+        state = instruction.operate(state)
         instructions.append(instruction)
 
-    return instructions
+    if verbose:
+        print(instructions)
+    
+    return state.output
 
 
 def runProgram(memory: List[int]):
-    instructions = interpretProgram(memory, 5)
-    print(instructions)
+    state = ThreadState(memory, 0, [5], [])
+    output = interpretProgram(state)
+    print(output)
 
+
+def readProgram(file) -> List[int]:
+    return [int(num) for num in file.readline().split(',')]
 
 if __name__ == "__main__":
     with open('day5.txt', 'r') as f:
-        memory = [int(num) for num in f.readline().split(',')]
+        memory = readProgram(f)
         runProgram(memory)

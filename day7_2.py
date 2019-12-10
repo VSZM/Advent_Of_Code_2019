@@ -1,4 +1,4 @@
-from day5 import readProgram, interpretProgram, ThreadState, ProgramPause
+from intcode import readProgram, interpretProgram, ThreadState, ProgramPause
 import itertools
 
 def calculateSignal(memory, permutation):

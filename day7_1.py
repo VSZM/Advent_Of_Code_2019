@@ -1,4 +1,4 @@
-from day5 import readProgram, interpretProgram, ThreadState
+from intcode import readProgram, interpretProgram, ThreadState
 import itertools
 from tqdm import tqdm
 
